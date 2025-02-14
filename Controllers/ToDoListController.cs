@@ -1,5 +1,8 @@
-﻿using ASP_NET_CORE_EF.Data;
+﻿// This is a personal academic project. Dear PVS-Studio, please check it.
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
+using ASP_NET_CORE_EF.Data;
 using ASP_NET_CORE_EF.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -15,7 +18,7 @@ namespace ASP_NET_CORE_EF.Controllers
         {
             _context = context;
         }
-
+        [Authorize(Roles = "adm")]
         [HttpGet]
         public async Task<ActionResult<IEnumerable<ToDoList>>> GetToDoLists()
         {
@@ -25,6 +28,7 @@ namespace ASP_NET_CORE_EF.Controllers
         }
 
         [HttpPost]
+        [Authorize(Roles = "visitor, adm")]
         public async Task<ActionResult<ToDoList>> PostToDoList(ToDoList toDoList)
         {
             _context.ToDoLists.Add(toDoList);
@@ -34,6 +38,7 @@ namespace ASP_NET_CORE_EF.Controllers
         }
 
         [HttpPut]
+        [Authorize(Roles = "visitor, adm")]
         public async Task<IActionResult> PutToDoList(int userId, int toDoId)
         {
             if (!await _context.Users.AnyAsync(u => u.Id == userId))

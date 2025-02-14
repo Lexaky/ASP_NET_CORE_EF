@@ -1,5 +1,8 @@
-﻿using ASP_NET_CORE_EF.Data;
+﻿// This is a personal academic project. Dear PVS-Studio, please check it.
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
+using ASP_NET_CORE_EF.Data;
 using ASP_NET_CORE_EF.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -15,14 +18,14 @@ namespace ASP_NET_CORE_EF.Controllers
         {
             _context = context;
         }
-
+        [Authorize(Roles = "adm")]
         [HttpGet]
         public async Task<ActionResult<IEnumerable<ToDo>>> GetAllToDos()
         {
             var toDos = await _context.ToDos.ToListAsync();
             return Ok(toDos);
         }
-
+        [Authorize(Roles = "visitor, adm")]
         [HttpPost]
         public async Task<IActionResult> CreateToDo([FromBody] ToDo newToDo)
         {
@@ -37,6 +40,7 @@ namespace ASP_NET_CORE_EF.Controllers
         }
 
         // Запись юзера в бд без дедлайна
+        [Authorize(Roles = "visitor, adm")]
         [HttpPut("simple")]
         public async Task<IActionResult> PutToDoSimple(string text)
         {
@@ -53,6 +57,7 @@ namespace ASP_NET_CORE_EF.Controllers
         }
 
         // Запись с дедлайном
+        [Authorize(Roles = "visitor, adm")]
         [HttpPut("with-deadline")]
         public async Task<IActionResult> PutToDoWithDeadline(string text, DateTime deadline)
         {
