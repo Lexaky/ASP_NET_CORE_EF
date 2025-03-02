@@ -1,6 +1,10 @@
 ﻿// This is a personal academic project. Dear PVS-Studio, please check it.
 // PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
+using ASP_NET_CORE_EF.CQRS.ToDo.Commands;
+using ASP_NET_CORE_EF.CQRS.ToDo.Queries;
+using ASP_NET_CORE_EF.CQRS;
 using ASP_NET_CORE_EF.Data;
+using ASP_NET_CORE_EF.DTO;
 using ASP_NET_CORE_EF.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -13,67 +17,111 @@ namespace ASP_NET_CORE_EF.Controllers
     public class ToDoController : ControllerBase
     {
         private readonly MyDbContext _context;
+        private readonly ICommandHandler<CreateToDoCommand, ToDo> _createToDoHandler;
+        private readonly ICommandHandler<UpdateToDoCommand, ToDo> _updateToDoHandler;
+        private readonly ICommandHandler<DeleteToDoCommand, bool> _deleteToDoHandler;
+        private readonly IQueryHandler<GetToDoQuery, ToDo> _getToDoHandler;
+        private readonly IQueryHandler<GetAllToDosQuery, IEnumerable<ToDo>> _getAllToDosHandler;
 
-        public ToDoController(MyDbContext context)
+        public ToDoController(MyDbContext context,
+            ICommandHandler<CreateToDoCommand, ToDo> createToDoHandler,
+            ICommandHandler<UpdateToDoCommand, ToDo> updateToDoHandler,
+            ICommandHandler<DeleteToDoCommand, bool> deleteToDoHandler,
+            IQueryHandler<GetToDoQuery, ToDo> getToDoHandler,
+            IQueryHandler<GetAllToDosQuery, IEnumerable<ToDo>> getAllToDosHandler)
         {
             _context = context;
+            _createToDoHandler = createToDoHandler;
+            _updateToDoHandler = updateToDoHandler;
+            _deleteToDoHandler = deleteToDoHandler;
+            _getToDoHandler = getToDoHandler;
+            _getAllToDosHandler = getAllToDosHandler;
         }
-        [Authorize(Roles = "adm")]
+
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<ToDo>>> GetAllToDos()
+        [Authorize(Roles = "user, admin")]
+        public async Task<ActionResult<IEnumerable<ToDo>>> GetTaskAll()
         {
-            var toDos = await _context.ToDos.ToListAsync();
-            return Ok(toDos);
+            var query = new GetAllToDosQuery();
+            var tasks = await _getAllToDosHandler.Handle(query);
+            return Ok(tasks);
         }
-        [Authorize(Roles = "visitor, adm")]
-        [HttpPost]
-        public async Task<IActionResult> CreateToDo([FromBody] ToDo newToDo)
+
+        [HttpGet("{id}")]
+        [Authorize(Roles = "user, admin")]
+        public async Task<ActionResult<ToDo>> GetTask(int id)
         {
-            if (newToDo == null)
+            var query = new GetToDoQuery { Id = id };
+            var task = await _getToDoHandler.Handle(query);
+
+            if (task == null)
             {
-                return BadRequest();
+                return NotFound();
+            }
+            return task;
+        }
+
+        [HttpPost]
+        [Authorize(Roles = "admin")]
+        public async Task<ActionResult<ToDo>> PostTask([FromBody] ToDoDTO taskDTO)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
             }
 
-            _context.ToDos.Add(newToDo);
-            await _context.SaveChangesAsync();
-            return CreatedAtAction(nameof(CreateToDo), new { id = newToDo.Id }, newToDo);
-        }
-
-        // Запись юзера в бд без дедлайна
-        [Authorize(Roles = "visitor, adm")]
-        [HttpPut("simple")]
-        public async Task<IActionResult> PutToDoSimple(string text)
-        {
-            var toDo = new ToDo
+            var command = new CreateToDoCommand
             {
-                Text = string.IsNullOrEmpty(text) ? "Undefined Task" : text,
-                Deadline = DateTime.Now
+                Text = taskDTO.Text,
+                CreatedAt = taskDTO.CreatedAt,
+                Deadline = taskDTO.Deadline
             };
 
-            _context.ToDos.Add(toDo);
-            await _context.SaveChangesAsync();
+            var task = await _createToDoHandler.Handle(command);
 
-            return CreatedAtAction(nameof(PutToDoSimple), new { id = toDo.Id }, toDo);
+            return CreatedAtAction(nameof(GetTask), new { id = task.Id }, task);
         }
 
-        // Запись с дедлайном
-        [Authorize(Roles = "visitor, adm")]
-        [HttpPut("with-deadline")]
-        public async Task<IActionResult> PutToDoWithDeadline(string text, DateTime deadline)
+        [HttpPut("{id}")]
+        [Authorize(Roles = "admin")]
+        public async Task<IActionResult> PutTask(int id, [FromBody] ToDoDTO taskDTO)
         {
-            // Создаем задачу с указанным временем Deadline
-            var toDo = new ToDo
+            if (!ModelState.IsValid)
             {
-                Text = string.IsNullOrEmpty(text) ? "Undefined Task" : text,
-                Deadline = deadline
+                return BadRequest(ModelState);
+            }
+
+            var command = new UpdateToDoCommand
+            {
+                Id = id,
+                Text = taskDTO.Text,
+                CreatedAt = taskDTO.CreatedAt,
+                Deadline = taskDTO.Deadline
             };
 
-            _context.ToDos.Add(toDo);
-            await _context.SaveChangesAsync();
+            var task = await _updateToDoHandler.Handle(command);
 
-            return CreatedAtAction(nameof(PutToDoWithDeadline), new { id = toDo.Id }, toDo);
+            if (task == null)
+            {
+                return NotFound();
+            }
+
+            return NoContent();
         }
 
+        [HttpDelete("{id}")]
+        [Authorize(Roles = "admin")]
+        public async Task<IActionResult> DeleteTask(int id)
+        {
+            var command = new DeleteToDoCommand { Id = id };
+            var result = await _deleteToDoHandler.Handle(command);
 
+            if (!result)
+            {
+                return NotFound();
+            }
+
+            return NoContent();
+        }
     }
 }

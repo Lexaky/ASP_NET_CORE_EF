@@ -1,6 +1,6 @@
 ﻿// This is a personal academic project. Dear PVS-Studio, please check it.
 // PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
-namespace ASP_NET_CORE_EF.Security
+namespace ASP_NET_CORE_EF.Security.Helpers
 {
     public interface ICacheTokenHelper
     {

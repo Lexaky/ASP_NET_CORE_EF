@@ -6,6 +6,15 @@ using Microsoft.OpenApi.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.DependencyInjection;
 using ASP_NET_CORE_EF.Security;
+using ASP_NET_CORE_EF.Security.Helpers;
+using ASP_NET_CORE_EF.CQRS.ToDo.Commands;
+using ASP_NET_CORE_EF.CQRS.ToDo.Handlers;
+using ASP_NET_CORE_EF.CQRS.ToDo.Queries;
+using ASP_NET_CORE_EF.CQRS.ToDoList.Commands;
+using ASP_NET_CORE_EF.CQRS.ToDoList.Handlers;
+using ASP_NET_CORE_EF.CQRS.ToDoList.Queries;
+using ASP_NET_CORE_EF.CQRS;
+using ASP_NET_CORE_EF.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -54,6 +63,18 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
+builder.Services.AddMemoryCache();
+
+builder.Services.AddScoped<ICommandHandler<CreateToDoCommand, ToDo>, CreateToDoHandler>();
+builder.Services.AddScoped<ICommandHandler<UpdateToDoCommand, ToDo>, UpdateToDoHandler>();
+builder.Services.AddScoped<ICommandHandler<DeleteToDoCommand, bool>, DeleteToDoHandler>();
+builder.Services.AddScoped<IQueryHandler<GetToDoQuery, ToDo>, GetToDoHandler>();
+builder.Services.AddScoped<IQueryHandler<GetAllToDosQuery, IEnumerable<ToDo>>, GetAllToDoHandler>();
+
+builder.Services.AddScoped<ICommandHandler<CreateToDoListCommand, ToDoList>, CreateToDoListHandler>();
+builder.Services.AddScoped<ICommandHandler<UpdateToDoListCommand, ToDoList>, UpdateToDoListHandler>();
+builder.Services.AddScoped<ICommandHandler<DeleteToDoListCommand, bool>, DeleteToDoListHandler>();
+builder.Services.AddScoped<IQueryHandler<GetToDoListQuery, ToDoList>, GetToDoListHandler>();
 
 // Подключение БД
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
