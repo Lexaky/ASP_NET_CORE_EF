@@ -1,30 +1,100 @@
+// This is a personal academic project. Dear PVS-Studio, please check it.
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
 using ASP_NET_CORE_EF.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.Extensions.DependencyInjection;
+using ASP_NET_CORE_EF.Security;
+using ASP_NET_CORE_EF.Security.Helpers;
+using ASP_NET_CORE_EF.CQRS.ToDo.Commands;
+using ASP_NET_CORE_EF.CQRS.ToDo.Handlers;
+using ASP_NET_CORE_EF.CQRS.ToDo.Queries;
+using ASP_NET_CORE_EF.CQRS.ToDoList.Commands;
+using ASP_NET_CORE_EF.CQRS.ToDoList.Handlers;
+using ASP_NET_CORE_EF.CQRS.ToDoList.Queries;
+using ASP_NET_CORE_EF.CQRS;
+using ASP_NET_CORE_EF.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddControllers();
+// Подключение конфигурации
+builder.Configuration.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
 
+builder.Services.AddControllers();
+builder.Services.AddEndpointsApiExplorer(); // Нужно для корректной работы Swagger
+
+// Добавляем аутентификацию с кастомным обработчиком Keycloak
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddScheme<JwtBearerOptions, KeycloakJwtBearerHandler>(JwtBearerDefaults.AuthenticationScheme, null);
+
+// Кэширование токенов
+builder.Services.AddMemoryCache();
+
+// Swagger
 builder.Services.AddSwaggerGen(c =>
 {
-    c.SwaggerDoc("v1", new OpenApiInfo { Title = "Лабораторная работа 1 - ORM", Version = "v1" });
+    c.SwaggerDoc("v1", new OpenApiInfo { Title = "Лабораторная работа 3 - keycloak", Version = "v2" });
+
+    // Добавляем возможность передавать JWT токен в Swagger
+    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Type = SecuritySchemeType.Http,
+        Scheme = "Bearer",
+        BearerFormat = "JWT",
+        In = ParameterLocation.Header,
+        Description = "Введите JWT токен в формате: Bearer {your_token}"
+    });
+
+    c.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
+                    Type = ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            new List<string>()
+        }
+    });
 });
 
+builder.Services.AddMemoryCache();
+
+builder.Services.AddScoped<ICommandHandler<CreateToDoCommand, ToDo>, CreateToDoHandler>();
+builder.Services.AddScoped<ICommandHandler<UpdateToDoCommand, ToDo>, UpdateToDoHandler>();
+builder.Services.AddScoped<ICommandHandler<DeleteToDoCommand, bool>, DeleteToDoHandler>();
+builder.Services.AddScoped<IQueryHandler<GetToDoQuery, ToDo>, GetToDoHandler>();
+builder.Services.AddScoped<IQueryHandler<GetAllToDosQuery, IEnumerable<ToDo>>, GetAllToDoHandler>();
+
+builder.Services.AddScoped<ICommandHandler<CreateToDoListCommand, ToDoList>, CreateToDoListHandler>();
+builder.Services.AddScoped<ICommandHandler<UpdateToDoListCommand, ToDoList>, UpdateToDoListHandler>();
+builder.Services.AddScoped<ICommandHandler<DeleteToDoListCommand, bool>, DeleteToDoListHandler>();
+builder.Services.AddScoped<IQueryHandler<GetToDoListQuery, ToDoList>, GetToDoListHandler>();
+
+// Подключение БД
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.AddDbContext<MyDbContext>(options =>
     options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
+builder.Services.AddHttpClient();
+builder.Services.AddSingleton<ICacheTokenHelper, CacheTokenHelper>();
+builder.Services.AddTransient<KeycloakJwtBearerHandler>();
 
 var app = builder.Build();
 
+// Обновление базы данных при старте приложения
 using (var scope = app.Services.CreateScope())
-{ // Для обновления бд
+{
     var dbContext = scope.ServiceProvider.GetRequiredService<MyDbContext>();
     dbContext.Database.Migrate();
 }
 
 if (app.Environment.IsDevelopment())
-{ // Swagger для разработки
+{
     app.UseSwagger();
     app.UseSwaggerUI(c =>
     {
@@ -33,6 +103,9 @@ if (app.Environment.IsDevelopment())
     });
 }
 
-app.UseRouting();
+app.UseRouting();       // Сначала маршрутизация
+app.UseAuthentication(); // Затем аутентификация
+app.UseAuthorization();  // Затем авторизация
+
 app.MapControllers();
 app.Run();

@@ -1,5 +1,8 @@
-﻿using Microsoft.EntityFrameworkCore;
-
+﻿// This is a personal academic project. Dear PVS-Studio, please check it.
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
+using Microsoft.EntityFrameworkCore;
+using System.ComponentModel;
+using System.ComponentModel.DataAnnotations;
 namespace ASP_NET_CORE_EF.Models
 {
     public class ToDo
